@@ -188,6 +188,7 @@ class RemotePrinterTask(models.Model):
 
         get_param = self.env['ir.config_parameter'].sudo().get_param
         relay_server_id = get_param('remote_printing_relay.default_server_id')
+        relay_server = self.env['remote.printer.server'].sudo().browse(relay_server_id) if relay_server_id else None
 
         if not printer:
             raise ValueError(f"Printer not found: {task_vals.get('printer_technical_name')}")
@@ -213,7 +214,7 @@ class RemotePrinterTask(models.Model):
             'printer_options': task_vals.get('printer_options') or {},
             'state': 'pending',
             'odoo_production_task_id': task_vals.get('odoo_production_task_id'),
-            'task_server_identifier': relay_server_id.server_identifier if relay_server_id else None,
+            'task_server_identifier': relay_server.server_identifier if relay_server else None,
         })
 
         return True
