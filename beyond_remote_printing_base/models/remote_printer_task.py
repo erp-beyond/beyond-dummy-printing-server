@@ -214,7 +214,7 @@ class RemotePrinterTask(models.Model):
             'printer_options': task_vals.get('printer_options') or {},
             'state': 'pending',
             'odoo_production_task_id': task_vals.get('odoo_production_task_id'),
-            'task_server_identifier': relay_server.server_identifier if relay_server else None,
+            'task_server_identifier': task_vals.get('server_identifier')
         })
 
         return True
