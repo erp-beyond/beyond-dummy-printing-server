@@ -24,6 +24,11 @@ class RemotePrinterTask(models.Model):
         help='Task ID on the production Odoo instance, used to sync state back.',
         readonly=True,
     )
+    task_server_identifier = fields.Integer(
+        string='Task Server Identifier',
+        help='Identifier of the relay server this task is routed to. Used for routing in multi-server setups.',
+        readonly=True,
+    )
 
     state = fields.Selection(
         selection=[
@@ -173,25 +178,28 @@ class RemotePrinterTask(models.Model):
 
     @api.model
     def create_from_production(self, task_vals):
-        # find printer by technical name
+        """
+        Called by production Odoo via XML-RPC.P
+        Finds the correct printer by technical name and creates the task.
+        """
         printer = self.env['remote.printer.printer'].sudo().search([
             ('technical_name', '=', task_vals.get('printer_technical_name'))
         ], limit=1)
 
+        get_param = self.env['ir.config_parameter'].sudo().get_param
+        relay_server_id = get_param('remote_printing_relay.default_server_id')
+
         if not printer:
             raise ValueError(f"Printer not found: {task_vals.get('printer_technical_name')}")
 
-        # resolve report if pdf task
         report_id = False
         if task_vals.get('task_type') == 'pdf' and task_vals.get('report_xml_id'):
-            # use ir.model.data to find report by xml_id instead of searching xml_id field
             xml_id = task_vals.get('report_xml_id')
             try:
                 report = self.env.ref(xml_id)
-                if report:
-                    report_id = report.id
+                report_id = report.id
             except Exception:
-                _logger.warning("Report not found on relay: %s", xml_id)
+                report_id = False
 
         self.sudo().create({
             'name': task_vals.get('name'),
@@ -205,6 +213,7 @@ class RemotePrinterTask(models.Model):
             'printer_options': task_vals.get('printer_options') or {},
             'state': 'pending',
             'odoo_production_task_id': task_vals.get('odoo_production_task_id'),
+            'task_server_identifier': relay_server_id.server_identifier if relay_server_id else None,
         })
 
         return True
