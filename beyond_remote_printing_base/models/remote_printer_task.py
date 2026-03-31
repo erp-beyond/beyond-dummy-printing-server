@@ -53,6 +53,8 @@ class RemotePrinterTask(models.Model):
     )
 
     printer_options = fields.Json(string="Printer Options", readonly=True)
+    pdf_data = fields.Binary("PDF", attachment=True)
+    pdf_filename = fields.Char("PDF Filename")
 
     @api.model
     def _create_zpl_task(
@@ -179,7 +181,7 @@ class RemotePrinterTask(models.Model):
     @api.model
     def create_from_production(self, task_vals):
         """
-        Called by production Odoo via XML-RPC.P
+        Called by production Odoo via XML-RPC.
         Finds the correct printer by technical name and creates the task.
         """
         printer = self.env['remote.printer.printer'].sudo().search([
@@ -188,7 +190,6 @@ class RemotePrinterTask(models.Model):
 
         get_param = self.env['ir.config_parameter'].sudo().get_param
         relay_server_id = get_param('remote_printing_relay.default_server_id')
-        relay_server = self.env['remote.printer.relay.server'].browse(int(relay_server_id)) if relay_server_id else None
 
         if not printer:
             raise ValueError(f"Printer not found: {task_vals.get('printer_technical_name')}")
@@ -202,6 +203,10 @@ class RemotePrinterTask(models.Model):
             except Exception:
                 report_id = False
 
+        # Get PDF data and filename from task_vals
+        pdf_data = task_vals.get('pdf_data') or False
+        pdf_filename = task_vals.get('pdf_filename') or 'document.pdf'
+
         self.sudo().create({
             'name': task_vals.get('name'),
             'printer_id': printer.id,
@@ -214,7 +219,9 @@ class RemotePrinterTask(models.Model):
             'printer_options': task_vals.get('printer_options') or {},
             'state': 'pending',
             'odoo_production_task_id': task_vals.get('odoo_production_task_id'),
-            'task_server_identifier': task_vals.get('task_server_identifier')
+            'task_server_identifier': relay_server_id.task_server_identifier if relay_server_id else None,
+            'pdf_data': pdf_data,
+            'pdf_filename': pdf_filename,
         })
 
         return True
